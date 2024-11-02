@@ -1,0 +1,6 @@
+gpt4all
+pydantic
+langgraph
+duckduckgo-search
+gradio
+langchain_community
