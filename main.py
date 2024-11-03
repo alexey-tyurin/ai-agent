@@ -48,7 +48,7 @@ class SearchQuery(BaseModel):
     intent: str
     from_date: str
     to_date: str = Field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
-    k: int = Field(default=10, ge=1, le=20)
+    max_results: int = Field(default=10, ge=1, le=20)
     session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
 
     @validator('from_date', 'to_date')
@@ -83,18 +83,23 @@ class AgentState(BaseModel):
 def normalize_arxiv_url(url):
     # Replace both pdf and html versions with abstract version
     normalized_url = re.sub(r'arxiv\.org/(pdf|html)/', 'arxiv.org/abs/', url)
-
-    # Remove .pdf extension if present
-    # normalized_url = re.sub(r'\.pdf$', '', normalized_url)
-
     return normalized_url
 
 # Tools
-# @tool
-def search_arxiv(keywords: str, from_date: str, to_date: str, max_results: int) -> List[Paper]:
-    """Search arXiv papers using DuckDuckGo"""
+@tool
+def search_arxiv(inputs: str) -> List[Paper]:
+    """Search arXiv papers using DuckDuckGo
+
+    Args:
+        inputs: JSON string containing search_query and max_results
+    """
+
+    # Parse the input JSON string
+    input_data = json.loads(inputs)
+    search_query = input_data['search_query']
+    max_results = input_data.get('max_results', 20)  # Default to 20 if not specified
+
     with DDGS() as ddgs:
-        search_query = f"site:arxiv.org {keywords} {from_date}..{to_date}"
         results = list(ddgs.text(search_query, max_results=max_results))
         papers = []
         for r in results:
@@ -137,18 +142,80 @@ def search_papers(state: AgentState) -> AgentState:
     messages = state.messages
     query = SearchQuery(**messages[-1]["content"])
 
-    papers = search_arxiv(query.keywords, query.from_date, query.to_date)
+    # Create search query string
+    search_query = f"site:arxiv.org {query.keywords} {query.from_date}..{query.to_date} "
+
+    # Create input dictionary and convert to JSON
+    search_inputs = {
+        'search_query': search_query,
+        'max_results': query.max_results  # You can adjust this or make it part of SearchQuery
+    }
+
+    # Call the tool with JSON string containing both arguments
+    papers = search_arxiv(json.dumps(search_inputs))
     state.papers = papers
     state.next_step = "summarize"
 
     # Save state
-    memory_saver.save(state.session_id, state.dict())
+    # memory_saver.save(state.session_id, state.dict())
     return state
+
+# Create the graph
+def create_graph():
+    workflow = StateGraph(AgentState, memory_saver)
+
+    workflow.add_node("search", search_papers)
+    # workflow.add_node("summarize", create_summaries)
+    # workflow.add_node("explain", create_explanations)
+    # workflow.add_node("rank", rank_papers)
+
+    workflow.set_entry_point("search")
+
+    workflow.add_edge("search", END)
+    # workflow.add_edge("search", "summarize")
+    # workflow.add_edge("summarize", "explain")
+    # workflow.add_edge("explain", "rank")
+    # workflow.add_edge("rank", END)
+
+    return workflow.compile()
 
 def search_papers_interface(keywords: str, intent: str, from_date: str,
                             to_date: str = datetime.now().strftime("%Y-%m-%d"),
-                            k: int = 10):
-    papers = search_arxiv(keywords, from_date, to_date, k)
+                            max_results: int = 10):
+
+    session_id = str(uuid.uuid4())
+
+    # Validate inputs using Pydantic
+    query = SearchQuery(
+        keywords=keywords,
+        intent=intent,
+        from_date=from_date,
+        to_date=to_date,
+        max_results=max_results,
+        session_id=session_id
+    )
+
+    graph = create_graph()
+
+    # Initialize state
+    state = AgentState(
+        messages=[{"content": query.dict()}],
+        next_step="search",
+        session_id=session_id
+    )
+
+    try:
+        # Run the graph
+        final_state = graph.invoke(state)
+
+        # Format results
+        results = []
+
+        return "\n".join(results)
+    except Exception as e:
+        # In case of error, clear the memory
+        # memory_saver.save(session_id, None)
+        raise e
 
 
 
