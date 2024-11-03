@@ -17,6 +17,7 @@ from bs4 import BeautifulSoup
 import re
 import getpass
 import os
+import asyncio
 
 def _set_env(var: str):
     if not os.environ.get(var):
@@ -102,6 +103,20 @@ def normalize_arxiv_url(url):
     normalized_url = re.sub(r'arxiv\.org/(pdf|html)/', 'arxiv.org/abs/', url)
     return normalized_url
 
+def run_async(coro):
+    """Helper function to run async code in sync context"""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop.run_until_complete(coro)
+
+async def async_invoke(llm: ChatOpenAI, prompt: str) -> str:
+    """Asynchronously invoke the LLM"""
+    response = await llm.ainvoke(prompt)
+    return response.content
+
 # Tools
 @tool
 def search_arxiv(inputs: str) -> List[Paper]:
@@ -164,15 +179,30 @@ def summarize_papers(text: str) -> List[PaperSummary]:
     
     Summary:"""
 
-    summaries = []
-    for paper in papers:
-        response = llm.invoke(prompt_template.format(paper_text=paper['snippet']))
-        summaries.append(PaperSummary(
-            title=paper['title'],
-            link=paper['link'],
-            summary=response.content
-        ))
-    return summaries
+    async def process_papers():
+        # Create list of coroutines
+        tasks = [
+            async_invoke(
+                llm,
+                prompt_template.format(paper_text=paper['snippet'])
+            )
+            for paper in papers
+        ]
+
+        # Execute all tasks concurrently
+        summaries_content = await asyncio.gather(*tasks)
+
+        # Create PaperSummary objects
+        return [
+            PaperSummary(
+                title=paper['title'],
+                link=paper['link'],
+                summary=summary
+            )
+            for paper, summary in zip(papers, summaries_content)
+        ]
+
+    return run_async(process_papers())
 
 @tool
 def explain_relevance(data: str) -> List[PaperExplanation]:
@@ -187,19 +217,34 @@ def explain_relevance(data: str) -> List[PaperExplanation]:
     
     Explanation:"""
 
-    explanations = []
-    for summary in summaries:
-        response = llm.invoke(prompt_template.format(
-            intent=intent,
-            summary=summary['summary']
-        ))
-        explanations.append(PaperExplanation(
-            title=summary['title'],
-            link=summary['link'],
-            summary=summary['summary'],
-            explanation=response.content
-        ))
-    return explanations
+    async def process_explanations():
+        # Create list of coroutines
+        tasks = [
+            async_invoke(
+                llm,
+                prompt_template.format(
+                    intent=intent,
+                    summary=summary['summary']
+                )
+            )
+            for summary in summaries
+        ]
+
+        # Execute all tasks concurrently
+        explanations_content = await asyncio.gather(*tasks)
+
+        # Create PaperExplanation objects
+        return [
+            PaperExplanation(
+                title=summary['title'],
+                link=summary['link'],
+                summary=summary['summary'],
+                explanation=explanation
+            )
+            for summary, explanation in zip(summaries, explanations_content)
+        ]
+
+    return run_async(process_explanations())
 
 @tool
 def rank_results(data: str) -> List[RankedPaper]:
@@ -217,28 +262,43 @@ def rank_results(data: str) -> List[RankedPaper]:
     
     Score:"""
 
-    rankings = []
-    for exp in explanations:
-        response = llm.invoke(prompt_template.format(
-            intent=intent,
-            summary=exp['summary'],
-            explanation=exp['explanation']
-        ))
-        try:
-            score = float(response.content)
-            score = max(0, min(10, score))  # Ensure score is between 0 and 10
-        except:
-            score = 0
+    async def process_rankings():
+        # Create list of coroutines
+        tasks = [
+            async_invoke(
+                llm,
+                prompt_template.format(
+                    intent=intent,
+                    summary=exp['summary'],
+                    explanation=exp['explanation']
+                )
+            )
+            for exp in explanations
+        ]
 
-        rankings.append(RankedPaper(
-            title=exp['title'],
-            link=exp['link'],
-            summary=exp['summary'],
-            explanation=exp['explanation'],
-            score=score
-        ))
+        # Execute all tasks concurrently
+        scores_content = await asyncio.gather(*tasks)
 
-    return sorted(rankings, key=lambda x: x.score, reverse=True)
+        # Process scores and create RankedPaper objects
+        rankings = []
+        for exp, score_str in zip(explanations, scores_content):
+            try:
+                score = float(score_str)
+                score = max(0, min(10, score))  # Ensure score is between 0 and 10
+            except:
+                score = 0
+
+            rankings.append(RankedPaper(
+                title=exp['title'],
+                link=exp['link'],
+                summary=exp['summary'],
+                explanation=exp['explanation'],
+                score=score
+            ))
+
+        return sorted(rankings, key=lambda x: x.score, reverse=True)
+
+    return run_async(process_rankings())
 
 # Graph functions
 def search_papers(state: AgentState) -> AgentState:
