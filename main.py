@@ -168,6 +168,33 @@ def summarize_papers(text: str) -> List[PaperSummary]:
         ))
     return summaries
 
+@tool
+def explain_relevance(data: str) -> List[PaperExplanation]:
+    """Explain how each paper relates to the search intent using ChatOpenAI"""
+    data_dict = json.loads(data)
+    summaries = data_dict['summaries']
+    intent = data_dict['intent']
+
+    prompt_template = """Explain how this paper could help with the following intent: {intent}
+
+    Paper summary: {summary}
+    
+    Explanation:"""
+
+    explanations = []
+    for summary in summaries:
+        response = llm.invoke(prompt_template.format(
+            intent=intent,
+            summary=summary['summary']
+        ))
+        explanations.append(PaperExplanation(
+            title=summary['title'],
+            link=summary['link'],
+            summary=summary['summary'],
+            explanation=response.content
+        ))
+    return explanations
+
 # Graph functions
 def search_papers(state: AgentState) -> AgentState:
     messages = state.messages
@@ -201,19 +228,37 @@ def create_summaries(state: AgentState) -> AgentState:
     state.next_step = "explain"
     return state
 
+def create_explanations(state: AgentState) -> AgentState:
+    query = SearchQuery(**state.messages[-1]["content"])
+
+    # Convert data to JSON string
+    data = {
+        'summaries': [{
+            'title': s.title,
+            'link': s.link,
+            'summary': s.summary
+        } for s in state.summaries],
+        'intent': query.intent
+    }
+
+    state.explanations = explain_relevance(json.dumps(data))
+    state.next_step = "rank"
+    return state
+
 # Create the graph
 def create_graph():
     workflow = StateGraph(AgentState)
 
     workflow.add_node("search", search_papers)
     workflow.add_node("summarize", create_summaries)
-    # workflow.add_node("explain", create_explanations)
+    workflow.add_node("explain", create_explanations)
     # workflow.add_node("rank", rank_papers)
 
     workflow.set_entry_point("search")
+
     workflow.add_edge("search", "summarize")
-    workflow.add_edge("summarize", END)
-    # workflow.add_edge("summarize", "explain")
+    workflow.add_edge("summarize", "explain")
+    workflow.add_edge("explain", END)
     # workflow.add_edge("explain", "rank")
     # workflow.add_edge("rank", END)
 
@@ -267,7 +312,7 @@ iface = gr.Interface(
         gr.Textbox(label="Search Intent"),
         gr.Textbox(label="From Date (YYYY-MM-DD)"),
         gr.Textbox(label="To Date (YYYY-MM-DD)", value=datetime.now().strftime("%Y-%m-%d")),
-        gr.Number(label="Number of Results", value=10, minimum=1, maximum=20)
+        gr.Number(label="Number of Results", value=1, minimum=1, maximum=20)
     ],
     outputs=gr.Textbox(label="Results"),
     title="Research Paper Search Agent",
