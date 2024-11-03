@@ -152,7 +152,7 @@ def get_arxiv_paper_abstract(url):
 def summarize_papers(text: str) -> List[PaperSummary]:
     """Summarize each paper using ChatOpenAI"""
     papers = json.loads(text)  # Convert string back to list of papers
-    prompt_template = """You are a research assistant. Summarize the following paper in 3-4 sentences:
+    prompt_template = """You are a research assistant. Summarize the following paper in 3-4 sentences with maximum 100 words:
     
     {paper_text}
     
@@ -353,6 +353,20 @@ def search_papers_interface(keywords: str, intent: str, from_date: str,
 
         # Format results
         results = []
+        rankings = final_state["rankings"]
+        for rank in rankings:
+            results.append(f"""
+Title: {rank.title}
+Link: {rank.link}
+Score: {rank.score}/10
+
+Summary:
+{rank.summary}
+
+Relevance to Intent:
+{rank.explanation}
+---------------------
+""")
 
         return "\n".join(results)
     except Exception as e:
@@ -368,7 +382,7 @@ iface = gr.Interface(
         gr.Textbox(label="Search Intent"),
         gr.Textbox(label="From Date (YYYY-MM-DD)"),
         gr.Textbox(label="To Date (YYYY-MM-DD)", value=datetime.now().strftime("%Y-%m-%d")),
-        gr.Number(label="Number of Results", value=2, minimum=1, maximum=20)
+        gr.Number(label="Number of Results (1 - 20)", value=2, minimum=1, maximum=20)
     ],
     outputs=gr.Textbox(label="Results"),
     title="Research Paper Search Agent",
