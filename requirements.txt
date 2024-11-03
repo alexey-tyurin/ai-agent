@@ -5,4 +5,5 @@ duckduckgo-search
 gradio
 langchain_community
 langchain_openai
+langchain_core
 bs4

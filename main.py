@@ -22,7 +22,13 @@ def _set_env(var: str):
     if not os.environ.get(var):
         os.environ[var] = getpass.getpass(f"{var}: ")
 
+# Set API keys for OpenAI
 _set_env("OPENAI_API_KEY")
+
+# Set API keys for LangSmith
+_set_env("LANGCHAIN_API_KEY")
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+os.environ["LANGCHAIN_PROJECT"] = "ai-agent"
 
 # Initialize ChatOpenAI
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
