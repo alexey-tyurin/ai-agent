@@ -175,7 +175,7 @@ def explain_relevance(data: str) -> List[PaperExplanation]:
     summaries = data_dict['summaries']
     intent = data_dict['intent']
 
-    prompt_template = """Explain how this paper could help with the following intent: {intent}
+    prompt_template = """Explain in 3-4 sentences with maximum 100 words how this paper could help with the following intent: {intent}
 
     Paper summary: {summary}
     
@@ -194,6 +194,45 @@ def explain_relevance(data: str) -> List[PaperExplanation]:
             explanation=response.content
         ))
     return explanations
+
+@tool
+def rank_results(data: str) -> List[RankedPaper]:
+    """Rank the papers based on relevance to intent using ChatOpenAI"""
+    data_dict = json.loads(data)
+    explanations = data_dict['explanations']
+    intent = data_dict['intent']
+
+    prompt_template = """Rate how well this paper matches the following intent on a scale of 0-10, where 10 is perfect match.
+    Provide only the numerical score.
+    
+    Intent: {intent}
+    Summary: {summary}
+    Explanation: {explanation}
+    
+    Score:"""
+
+    rankings = []
+    for exp in explanations:
+        response = llm.invoke(prompt_template.format(
+            intent=intent,
+            summary=exp['summary'],
+            explanation=exp['explanation']
+        ))
+        try:
+            score = float(response.content)
+            score = max(0, min(10, score))  # Ensure score is between 0 and 10
+        except:
+            score = 0
+
+        rankings.append(RankedPaper(
+            title=exp['title'],
+            link=exp['link'],
+            summary=exp['summary'],
+            explanation=exp['explanation'],
+            score=score
+        ))
+
+    return sorted(rankings, key=lambda x: x.score, reverse=True)
 
 # Graph functions
 def search_papers(state: AgentState) -> AgentState:
@@ -245,6 +284,24 @@ def create_explanations(state: AgentState) -> AgentState:
     state.next_step = "rank"
     return state
 
+def rank_papers(state: AgentState) -> AgentState:
+    query = SearchQuery(**state.messages[-1]["content"])
+
+    # Convert data to JSON string
+    data = {
+        'explanations': [{
+            'title': e.title,
+            'link': e.link,
+            'summary': e.summary,
+            'explanation': e.explanation
+        } for e in state.explanations],
+        'intent': query.intent
+    }
+
+    rankings = rank_results(json.dumps(data))
+    state.rankings = rankings
+    state.next_step = "end"
+    return state
 # Create the graph
 def create_graph():
     workflow = StateGraph(AgentState)
@@ -252,15 +309,14 @@ def create_graph():
     workflow.add_node("search", search_papers)
     workflow.add_node("summarize", create_summaries)
     workflow.add_node("explain", create_explanations)
-    # workflow.add_node("rank", rank_papers)
+    workflow.add_node("rank", rank_papers)
 
     workflow.set_entry_point("search")
 
     workflow.add_edge("search", "summarize")
     workflow.add_edge("summarize", "explain")
-    workflow.add_edge("explain", END)
-    # workflow.add_edge("explain", "rank")
-    # workflow.add_edge("rank", END)
+    workflow.add_edge("explain", "rank")
+    workflow.add_edge("rank", END)
 
     # Compile graph with persistence for checkpoints
     return workflow.compile(checkpointer=memory_saver)
@@ -312,7 +368,7 @@ iface = gr.Interface(
         gr.Textbox(label="Search Intent"),
         gr.Textbox(label="From Date (YYYY-MM-DD)"),
         gr.Textbox(label="To Date (YYYY-MM-DD)", value=datetime.now().strftime("%Y-%m-%d")),
-        gr.Number(label="Number of Results", value=1, minimum=1, maximum=20)
+        gr.Number(label="Number of Results", value=2, minimum=1, maximum=20)
     ],
     outputs=gr.Textbox(label="Results"),
     title="Research Paper Search Agent",
