@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field, validator
 from duckduckgo_search import DDGS
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_community.llms import GPT4All
+from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt.tool_executor import ToolExecutor
 from langgraph.checkpoint.memory import MemorySaver
@@ -15,6 +15,17 @@ import json
 import requests
 from bs4 import BeautifulSoup
 import re
+import getpass
+import os
+
+def _set_env(var: str):
+    if not os.environ.get(var):
+        os.environ[var] = getpass.getpass(f"{var}: ")
+
+_set_env("OPENAI_API_KEY")
+
+# Initialize ChatOpenAI
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
 # Initialize MemorySaver
 memory_saver = MemorySaver()
@@ -137,6 +148,26 @@ def get_arxiv_paper_abstract(url):
         print(f"Error parsing the content: {e}")
         return None
 
+@tool
+def summarize_papers(text: str) -> List[PaperSummary]:
+    """Summarize each paper using ChatOpenAI"""
+    papers = json.loads(text)  # Convert string back to list of papers
+    prompt_template = """You are a research assistant. Summarize the following paper in 3-4 sentences:
+    
+    {paper_text}
+    
+    Summary:"""
+
+    summaries = []
+    for paper in papers:
+        response = llm.invoke(prompt_template.format(paper_text=paper['snippet']))
+        summaries.append(PaperSummary(
+            title=paper['title'],
+            link=paper['link'],
+            summary=response.content
+        ))
+    return summaries
+
 # Graph functions
 def search_papers(state: AgentState) -> AgentState:
     messages = state.messages
@@ -158,19 +189,30 @@ def search_papers(state: AgentState) -> AgentState:
 
     return state
 
+def create_summaries(state: AgentState) -> AgentState:
+    # Convert papers to JSON string
+    papers_json = json.dumps([{
+        'title': p.title,
+        'link': p.link,
+        'snippet': p.snippet
+    } for p in state.papers])
+
+    state.summaries = summarize_papers(papers_json)
+    state.next_step = "explain"
+    return state
+
 # Create the graph
 def create_graph():
     workflow = StateGraph(AgentState)
 
     workflow.add_node("search", search_papers)
-    # workflow.add_node("summarize", create_summaries)
+    workflow.add_node("summarize", create_summaries)
     # workflow.add_node("explain", create_explanations)
     # workflow.add_node("rank", rank_papers)
 
     workflow.set_entry_point("search")
-
-    workflow.add_edge("search", END)
-    # workflow.add_edge("search", "summarize")
+    workflow.add_edge("search", "summarize")
+    workflow.add_edge("summarize", END)
     # workflow.add_edge("summarize", "explain")
     # workflow.add_edge("explain", "rank")
     # workflow.add_edge("rank", END)

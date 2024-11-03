@@ -4,4 +4,5 @@ langgraph
 duckduckgo-search
 gradio
 langchain_community
+langchain_openai
 bs4
