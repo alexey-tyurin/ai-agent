@@ -156,13 +156,11 @@ def search_papers(state: AgentState) -> AgentState:
     state.papers = papers
     state.next_step = "summarize"
 
-    # Save state
-    # memory_saver.save(state.session_id, state.dict())
     return state
 
 # Create the graph
 def create_graph():
-    workflow = StateGraph(AgentState, memory_saver)
+    workflow = StateGraph(AgentState)
 
     workflow.add_node("search", search_papers)
     # workflow.add_node("summarize", create_summaries)
@@ -177,7 +175,8 @@ def create_graph():
     # workflow.add_edge("explain", "rank")
     # workflow.add_edge("rank", END)
 
-    return workflow.compile()
+    # Compile graph with persistence for checkpoints
+    return workflow.compile(checkpointer=memory_saver)
 
 def search_papers_interface(keywords: str, intent: str, from_date: str,
                             to_date: str = datetime.now().strftime("%Y-%m-%d"),
@@ -206,15 +205,14 @@ def search_papers_interface(keywords: str, intent: str, from_date: str,
 
     try:
         # Run the graph
-        final_state = graph.invoke(state)
+        config = {"configurable": {"thread_id": "1"}}
+        final_state = graph.invoke(state, config)
 
         # Format results
         results = []
 
         return "\n".join(results)
     except Exception as e:
-        # In case of error, clear the memory
-        # memory_saver.save(session_id, None)
         raise e
 
 
@@ -231,7 +229,7 @@ iface = gr.Interface(
     ],
     outputs=gr.Textbox(label="Results"),
     title="Research Paper Search Agent",
-    description="Search and analyze arXiv papers based on keywords and intent using local LLM"
+    description="Search and analyze arXiv papers based on keywords and intent using LLM"
 )
 
 
