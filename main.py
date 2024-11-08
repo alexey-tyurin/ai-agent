@@ -557,6 +557,7 @@ def create_graph():
     # Compile graph with persistence for checkpoints
     return workflow.compile(checkpointer=memory_saver)
 
+
 def search_papers_interface(keywords: str, intent: str, from_date: str,
                             to_date: str = datetime.now().strftime("%Y-%m-%d"),
                             max_results: int = 10):
@@ -583,8 +584,6 @@ def search_papers_interface(keywords: str, intent: str, from_date: str,
     )
 
     try:
-        # Run the graph
-        config = {"configurable": {"thread_id": "1"}}
         # Initialize results storage
         all_results = []
         iteration = 1
@@ -593,10 +592,19 @@ def search_papers_interface(keywords: str, intent: str, from_date: str,
         # Run iterations
         while iteration <= 3:  # Maximum 3 iterations
             # Run the graph
-            current_state = graph.invoke(current_state, config)
+            current_state = graph.invoke(current_state, {"configurable": {"thread_id": "1"}})
+
+            # Get current intent from the state dictionary
+            state_dict = dict(current_state)
+            current_messages = state_dict.get('messages', [])
+            if current_messages:
+                current_content = current_messages[-1].get('content', {})
+                current_intent = current_content.get('intent', intent)  # Fallback to original intent
+            else:
+                current_intent = intent
 
             # Format results for this iteration
-            results = [f"\nIteration {iteration} Results:"]
+            results = [f"\nIteration {iteration} Results (Intent: {current_intent}):"]
             for rank in current_state["rankings"]:
                 results.append(f"""
 Title: {rank.title}
@@ -621,27 +629,64 @@ Relevance to Intent:
             if iteration > 3:
                 all_results.append("\nReached maximum number of iterations (3).")
 
-        return "\n".join(all_results)
+        # Get final intent for updating the interface
+        final_state_dict = dict(current_state)
+        final_messages = final_state_dict.get('messages', [])
+        if final_messages:
+            final_content = final_messages[-1].get('content', {})
+            final_intent = final_content.get('intent', intent)
+        else:
+            final_intent = intent
+
+        # Return both results and the updated intent
+        return {
+            results_box: "\n".join(all_results),
+            intent_box: final_intent
+        }
 
     except Exception as e:
         raise e
 
+# Create Gradio interface with proper component references
+with gr.Blocks(title="Research Paper Search Agent") as iface:
+    gr.Markdown("# Research Paper Search Agent")
+    gr.Markdown("Search and analyze arXiv papers based on keywords and intent using LLM")
 
-# Create Gradio interface
-iface = gr.Interface(
-    fn=search_papers_interface,
-    inputs=[
-        gr.Textbox(label="Search Keywords"),
-        gr.Textbox(label="Search Intent"),
-        gr.Textbox(label="From Date (YYYY-MM-DD)"),
-        gr.Textbox(label="To Date (YYYY-MM-DD)", value=datetime.now().strftime("%Y-%m-%d")),
-        gr.Number(label="Number of Results (1 - 20)", value=2, minimum=1, maximum=20)
-    ],
-    outputs=gr.Textbox(label="Results"),
-    title="Research Paper Search Agent",
-    description="Search and analyze arXiv papers based on keywords and intent using LLM"
-)
+    with gr.Row():
+        with gr.Column():
+            keywords_box = gr.Textbox(label="Search Keywords")
+            intent_box = gr.Textbox(label="Search Intent")
+            date_from_box = gr.Textbox(label="From Date (YYYY-MM-DD)")
+            date_to_box = gr.Textbox(
+                label="To Date (YYYY-MM-DD)",
+                value=datetime.now().strftime("%Y-%m-%d")
+            )
+            results_count = gr.Number(
+                label="Number of Results (1 - 20)",
+                value=2,
+                minimum=1,
+                maximum=20
+            )
 
+            search_button = gr.Button("Search")
+
+    results_box = gr.Textbox(label="Results")
+
+    # Connect the interface components
+    search_button.click(
+        fn=search_papers_interface,
+        inputs=[
+            keywords_box,
+            intent_box,
+            date_from_box,
+            date_to_box,
+            results_count
+        ],
+        outputs=[
+            results_box,
+            intent_box
+        ]
+    )
 
 if __name__ == "__main__":
     iface.launch()
