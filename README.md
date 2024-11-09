@@ -126,20 +126,24 @@ python main.py
 ## Screenshots of the flow
 
 ### 1) Initial screen
-![](./screenshots/AI agent screen 1.png)
+
+<p>
+        <img alt="ai-agent" src="https://github.com/alexey-tyurin/ai-agent/blob/main/screenshots/screen1.png?raw=true" width="auto" height="auto"></img> 
+</p>
+
 
 
 ### 2) First results
-![](./screenshots/AI agent screen 2.png)
+![](./screenshots/screen2.png)
 
 
 ### 3) Changing intent
-![](./screenshots/AI agent screen 3.png)
+![](./screenshots/screen3.png)
 
 
 ### 4) Continue search with new intent
-![](./screenshots/AI agent screen 4.png)
+![](./screenshots/screen4.png)
 
 
 ### 5) Final results with updated intent
-![](./screenshots/AI agent screen 5.png)
+![](./screenshots/screen5.png)
