@@ -4,7 +4,7 @@ import socketserver
 import threading
 import webbrowser
 from urllib.parse import parse_qs, urlparse
-from typing import Annotated, Sequence, TypedDict, Union
+from typing import Sequence
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph, END
 
@@ -15,13 +15,30 @@ import tools
 memory_saver = MemorySaver()
 
 def should_continue(state: model.AgentState) -> Sequence[str]:
-    """Determine the next node based on human decision"""
+    """
+    Determines next processing step based on state.
+
+    Args:
+        state (model.AgentState): Current agent state
+
+    Returns:
+        Sequence[str]: Next step(s) to execute
+    """
     if state.next_step == "stop":
         return ["end"]
     return ["explain"]
 
 # Graph functions
 def search_papers(state: model.AgentState) -> model.AgentState:
+    """
+    Executes paper search and updates state.
+
+    Args:
+        state (model.AgentState): Current agent state
+
+    Returns:
+        model.AgentState: Updated state with search results
+    """
     messages = state.messages
     query = model.SearchQuery(**messages[-1]["content"])
 
@@ -31,7 +48,7 @@ def search_papers(state: model.AgentState) -> model.AgentState:
     # Create input dictionary and convert to JSON
     search_inputs = {
         'search_query': search_query,
-        'max_results': query.max_results  # You can adjust this or make it part of SearchQuery
+        'max_results': query.max_results
     }
 
     # Call the tool with JSON string containing both arguments
@@ -42,6 +59,15 @@ def search_papers(state: model.AgentState) -> model.AgentState:
     return state
 
 def create_summaries(state: model.AgentState) -> model.AgentState:
+    """
+    Generates paper summaries and updates state.
+
+    Args:
+        state (model.AgentState): Current agent state
+
+    Returns:
+        model.AgentState: Updated state with paper summaries
+    """
     # Convert papers to JSON string
     papers_json = json.dumps([{
         'title': p.title,
@@ -54,6 +80,15 @@ def create_summaries(state: model.AgentState) -> model.AgentState:
     return state
 
 def create_explanations(state: model.AgentState) -> model.AgentState:
+    """
+    Generates relevance explanations and updates state.
+
+    Args:
+        state (model.AgentState): Current agent state
+
+    Returns:
+        model.AgentState: Updated state with explanations
+    """
     query = model.SearchQuery(**state.messages[-1]["content"])
 
     # Convert data to JSON string
@@ -71,6 +106,15 @@ def create_explanations(state: model.AgentState) -> model.AgentState:
     return state
 
 def rank_papers(state: model.AgentState) -> model.AgentState:
+    """
+    Ranks papers by relevance and updates state.
+
+    Args:
+        state (model.AgentState): Current agent state
+
+    Returns:
+        model.AgentState: Updated state with paper rankings
+    """
     query = model.SearchQuery(**state.messages[-1]["content"])
 
     # Convert data to JSON string
@@ -90,7 +134,16 @@ def rank_papers(state: model.AgentState) -> model.AgentState:
     return state
 
 def human_feedback(state: model.AgentState) -> model.AgentState:
-    """Get human feedback after reviewing ranked results using a simple HTTP server"""
+    """
+    Collects human feedback via web interface.
+    
+    Args:
+        state (model.AgentState): Current agent state
+        
+    Returns:
+        model.AgentState: Updated state based on human feedback
+    """
+
     query = model.SearchQuery(**state.messages[-1]["content"])
     feedback = {"choice": None, "new_intent": None}
 
@@ -215,6 +268,12 @@ def human_feedback(state: model.AgentState) -> model.AgentState:
 
 # Create the graph
 def create_graph():
+    """
+    Creates the workflow graph for paper search process.
+
+    Returns:
+        StateGraph: Compiled workflow graph with checkpointing
+    """
     workflow = StateGraph(model.AgentState)
 
     workflow.add_node("search", search_papers)

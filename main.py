@@ -14,6 +14,22 @@ import graph
 def search_papers_interface(keywords: str, intent: str, from_date: str,
                             to_date: str = datetime.now().strftime("%Y-%m-%d"),
                             max_results: int = 10):
+    """
+    Creates a search interface for arXiv papers based on user inputs.
+
+    Args:
+        keywords (str): Search terms to find relevant papers
+        intent (str): User's research intent/goal
+        from_date (str): Start date for paper search (YYYY-MM-DD)
+        to_date (str): End date for paper search (YYYY-MM-DD)
+        max_results (int): Maximum number of papers to return (default: 10)
+
+    Returns:
+        dict: Contains results_box with formatted search results and intent_box with final search intent
+
+    Raises:
+        Exception: Any errors during the search process
+    """
 
     session_id = str(uuid.uuid4())
 

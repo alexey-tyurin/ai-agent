@@ -3,7 +3,7 @@ import json
 import re
 import asyncio
 from random import uniform
-from typing import List, Dict, TypedDict
+from typing import List
 import requests
 import os
 import getpass
@@ -16,6 +16,12 @@ from langchain_openai import ChatOpenAI
 import model
 
 def _set_env(var: str):
+    """
+    Sets environment variable if not already set.
+
+    Args:
+        var (str): Name of environment variable to set
+    """
     if not os.environ.get(var):
         os.environ[var] = getpass.getpass(f"{var}: ")
 
@@ -26,7 +32,15 @@ _set_env("OPENAI_API_KEY")
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
 def run_async(coro):
-    """Helper function to run async code in sync context"""
+    """
+    Runs asynchronous code in synchronous context.
+
+    Args:
+        coro: Coroutine to run
+
+    Returns:
+        Any: Result of coroutine execution
+    """
     try:
         loop = asyncio.get_event_loop()
     except RuntimeError:
@@ -35,21 +49,45 @@ def run_async(coro):
     return loop.run_until_complete(coro)
 
 async def async_invoke(llm: ChatOpenAI, prompt: str) -> str:
-    """Asynchronously invoke the LLM"""
+    """
+    Asynchronously invokes the language model.
+
+    Args:
+        llm (ChatOpenAI): Language model instance
+        prompt (str): Prompt to send to model
+
+    Returns:
+        str: Model response content
+    """
     response = await llm.ainvoke(prompt)
     return response.content
 
 def normalize_arxiv_url(url):
-    # Replace both pdf and html versions with abstract version
+    """
+    Normalizes arXiv URLs to use abstract version.
+
+    Args:
+        url (str): arXiv URL to normalize
+
+    Returns:
+        str: Normalized URL using /abs/ format
+    """
     normalized_url = re.sub(r'arxiv\.org/(pdf|html)/', 'arxiv.org/abs/', url)
     return normalized_url
 
 @tool
 def search_arxiv(inputs: str) -> List[model.Paper]:
-    """Search arXiv papers using DuckDuckGo
+    """
+    Searches arXiv papers using DuckDuckGo.
 
     Args:
-        inputs: JSON string containing search_query and max_results
+        inputs (str): JSON string containing search_query and max_results
+
+    Returns:
+        List[model.Paper]: List of found papers
+
+    Raises:
+        RatelimitException: If DuckDuckGo rate limit is hit
     """
 
     # Parse the input JSON string
@@ -89,6 +127,15 @@ def search_arxiv(inputs: str) -> List[model.Paper]:
         return papers
 
 def get_arxiv_paper_abstract(url):
+    """
+    Extracts paper abstract from arXiv page.
+
+    Args:
+        url (str): URL of arXiv paper
+
+    Returns:
+        str: Paper abstract text or None if extraction fails
+    """
     try:
         # Send request with headers to mimic a browser
         headers = {
@@ -112,7 +159,15 @@ def get_arxiv_paper_abstract(url):
 
 @tool
 def summarize_papers(text: str) -> List[model.PaperSummary]:
-    """Summarize each paper using ChatOpenAI"""
+    """
+    Generates summaries for papers using AI.
+
+    Args:
+        text (str): JSON string of papers to summarize
+
+    Returns:
+        List[model.PaperSummary]: List of paper summaries
+    """
     papers = json.loads(text)  # Convert string back to list of papers
     prompt_template = """You are a research assistant. Summarize the following paper in 3-4 sentences with maximum 100 words:
     
@@ -147,7 +202,15 @@ def summarize_papers(text: str) -> List[model.PaperSummary]:
 
 @tool
 def explain_relevance(data: str) -> List[model.PaperExplanation]:
-    """Explain how each paper relates to the search intent using ChatOpenAI"""
+    """
+    Explains paper relevance to search intent using AI.
+
+    Args:
+        data (str): JSON string containing summaries and intent
+
+    Returns:
+        List[model.PaperExplanation]: List of papers with relevance explanations
+    """
     data_dict = json.loads(data)
     summaries = data_dict['summaries']
     intent = data_dict['intent']
@@ -189,7 +252,15 @@ def explain_relevance(data: str) -> List[model.PaperExplanation]:
 
 @tool
 def rank_results(data: str) -> List[model.RankedPaper]:
-    """Rank the papers based on relevance to intent using ChatOpenAI"""
+    """
+    Ranks papers based on relevance to intent using AI.
+
+    Args:
+        data (str): JSON string containing explanations and intent
+
+    Returns:
+        List[model.RankedPaper]: List of papers with relevance scores
+    """
     data_dict = json.loads(data)
     explanations = data_dict['explanations']
     intent = data_dict['intent']
