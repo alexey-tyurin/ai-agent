@@ -47,7 +47,7 @@ The project evolved through several stages:
    - Added asynchronous processing for better performance
    - Enhanced abstract extraction reliability
 
-## Impact and Use Cases
+## Use Cases
 
 The AI agent can be used for:
 - **Academic Research**: PhD students using it to conduct comprehensive literature reviews
