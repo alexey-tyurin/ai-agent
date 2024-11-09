@@ -126,7 +126,6 @@ python main.py
 ## Screenshots of the flow
 
 ### 1) Initial screen
-
 <p>
         <img alt="ai-agent" src="https://github.com/alexey-tyurin/ai-agent/blob/main/screenshots/screen1.png?raw=true" width="auto" height="auto"></img> 
 </p>
@@ -134,16 +133,50 @@ python main.py
 
 
 ### 2) First results
-![](./screenshots/screen2.png)
+<p>
+        <img alt="ai-agent" src="https://github.com/alexey-tyurin/ai-agent/blob/main/screenshots/screen2.png?raw=true" width="auto" height="auto"></img> 
+</p>
 
 
 ### 3) Changing intent
-![](./screenshots/screen3.png)
+<p>
+        <img alt="ai-agent" src="https://github.com/alexey-tyurin/ai-agent/blob/main/screenshots/screen3.png?raw=true" width="auto" height="auto"></img> 
+</p>
 
 
 ### 4) Continue search with new intent
-![](./screenshots/screen4.png)
+<p>
+        <img alt="ai-agent" src="https://github.com/alexey-tyurin/ai-agent/blob/main/screenshots/screen4.png?raw=true" width="auto" height="auto"></img> 
+</p>
 
 
 ### 5) Final results with updated intent
-![](./screenshots/screen5.png)
+<p>
+        <img alt="ai-agent" src="https://github.com/alexey-tyurin/ai-agent/blob/main/screenshots/screen5.png?raw=true" width="auto" height="auto"></img> 
+</p>
+
+## Acknowledgments
+
+### References
+https://www.deeplearning.ai/the-batch/how-agents-can-improve-llm-performance/
+
+https://www.deeplearning.ai/the-batch/agentic-design-patterns-part-2-reflection
+
+https://www.deeplearning.ai/the-batch/agentic-design-patterns-part-3-tool-use/
+
+https://www.deeplearning.ai/the-batch/agentic-design-patterns-part-4-planning/
+
+https://www.deeplearning.ai/the-batch/agentic-design-patterns-part-5-multi-agent-collaboration/
+
+https://academy.langchain.com/courses/intro-to-langgraph
+
+https://langchain-ai.github.io/langgraph/
+
+https://smith.langchain.com/
+
+### My certificate for LangGraph
+https://academy.langchain.com/certificates/oylo2acrsw
+
+## Contact Information
+
+For any questions or feedback, please contact Alexey Tyurin at altyurin3@gmail.com.
