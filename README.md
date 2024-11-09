@@ -166,9 +166,10 @@ python main.py
 
 ## Future Improvements
 
+- Enhance explaining relevance to search intent algorithm
+- Enhance ranking algorithm
 - Add result caching
 - Add saving results to files functionality
-- Enhance ranking algorithm
 - Add export functionality for results
 - Add support for additional paper repositories
 - Add paper clustering by topic
