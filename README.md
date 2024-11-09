@@ -230,3 +230,9 @@ https://academy.langchain.com/certificates/oylo2acrsw
 ## Contact Information
 
 For any questions or feedback, please contact Alexey Tyurin at altyurin3@gmail.com.
+
+## License
+
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/alexey-tyurin/ai-agent/blob/main/LICENSE) file for details.
